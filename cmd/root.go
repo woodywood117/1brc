@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"unsafe"
 
 	"github.com/spf13/cobra"
 )
@@ -44,12 +45,14 @@ func run(cmd *cobra.Command, args []string) {
 
 	// Read file line by line and calculate
 	var line string
+	var l []byte
 	for {
-		line, err = buffer.ReadString('\n')
+		l, _, err = buffer.ReadLine()
 		if err != nil {
 			break
 		}
-		line = line[:len(line)-1]
+		line = unsafe.String(unsafe.SliceData(l), len(l))
+		//line = string(l)
 
 		index := strings.Index(line, ";")
 		station := line[:index]
@@ -68,7 +71,7 @@ func run(cmd *cobra.Command, args []string) {
 				Sum:   0,
 				Count: 0,
 			}
-			measurements[station] = measurement
+			measurements[fmt.Sprintf("%s", station)] = measurement
 		}
 		measurement.Min = min(measurement.Min, value)
 		measurement.Max = max(measurement.Max, value)
