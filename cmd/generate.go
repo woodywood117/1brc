@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bufio"
 	"fmt"
 	"github.com/spf13/cobra"
 	"math/rand"
@@ -25,6 +26,9 @@ var generateCmd = &cobra.Command{
 		defer file.Close()
 		defer file.Sync()
 
+		buffer := bufio.NewWriter(file)
+		defer buffer.Flush()
+
 		count, err := cmd.Flags().GetInt64("count")
 		if err != nil {
 			panic(err)
@@ -36,7 +40,7 @@ var generateCmd = &cobra.Command{
 			// Pick a random temperature between -99.9 and 99.9 inclusive
 			temperature := rand.Float64()*199.8 - 99.9
 			// Write the station and temperature to the file
-			_, err = file.WriteString(station + ";" + fmt.Sprintf("%.1f", temperature) + "\n")
+			_, err = buffer.WriteString(station + ";" + fmt.Sprintf("%.1f", temperature) + "\n")
 			if err != nil {
 				panic(err)
 			}
