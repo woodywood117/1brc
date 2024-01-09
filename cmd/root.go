@@ -40,7 +40,8 @@ func run(cmd *cobra.Command, args []string) {
 	}
 	defer file.Close()
 
-	buffer := bufio.NewReader(file)
+	buffer := bufio.NewReaderSize(file, 1024*1024*1024)
+	//buffer := bufio.NewReader(file)
 
 	// Read file line by line and calculate
 	var line string
