@@ -34,14 +34,13 @@ func run(cmd *cobra.Command, args []string) {
 	}
 	var measurements = make(map[string]*Measurement)
 
-	file, err := os.Open("measurements_1M.txt")
+	file, err := os.Open("measurements.txt")
 	if err != nil {
 		panic(err)
 	}
 	defer file.Close()
 
 	buffer := bufio.NewReaderSize(file, 1024*1024*1024)
-	//buffer := bufio.NewReader(file)
 
 	// Read file line by line and calculate
 	var line string
@@ -52,19 +51,16 @@ func run(cmd *cobra.Command, args []string) {
 		}
 		line = line[:len(line)-1]
 
-		parts := strings.Split(line, ";")
-		if len(parts) != 2 {
-			err = errors.New("invalid line")
-			break
-		}
-
-		value, err := strconv.ParseFloat(parts[1], 64)
+		index := strings.Index(line, ";")
+		station := line[:index]
+		temp := line[index+1:]
+		value, err := strconv.ParseFloat(temp, 64)
 		if err != nil {
 			err = errors.New("invalid line")
 			break
 		}
 
-		measurement, ok := measurements[parts[0]]
+		measurement, ok := measurements[station]
 		if !ok {
 			measurement = &Measurement{
 				Min:   100,
@@ -72,7 +68,7 @@ func run(cmd *cobra.Command, args []string) {
 				Sum:   0,
 				Count: 0,
 			}
-			measurements[parts[0]] = measurement
+			measurements[station] = measurement
 		}
 		measurement.Min = min(measurement.Min, value)
 		measurement.Max = max(measurement.Max, value)
