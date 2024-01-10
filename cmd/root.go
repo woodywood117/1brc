@@ -2,12 +2,11 @@ package cmd
 
 import (
 	"bufio"
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
 	"os"
-	"slices"
-	"strings"
 	"unsafe"
 
 	"github.com/spf13/cobra"
@@ -25,6 +24,8 @@ func Execute() {
 	}
 }
 
+const Gigabyte = 1024 * 1024 * 1024
+
 func run(cmd *cobra.Command, args []string) {
 	type Measurement struct {
 		Min   float64
@@ -40,22 +41,21 @@ func run(cmd *cobra.Command, args []string) {
 	}
 	defer file.Close()
 
-	buffer := bufio.NewReaderSize(file, 1024*1024*1024)
+	buffer := bufio.NewReaderSize(file, Gigabyte)
 
 	// Read file line by line and calculate
-	var line string
 	var l []byte
+	var index int
+	var station string
+	var temp float64
 	for {
 		l, _, err = buffer.ReadLine()
 		if err != nil {
 			break
 		}
-		line = unsafe.String(unsafe.SliceData(l), len(l))
-
-		index := strings.Index(line, ";")
-		station := line[:index]
-		temp := line[index+1:]
-		value := FastParseFloat(temp)
+		index = bytes.IndexByte(l, ';')
+		station = unsafe.String(unsafe.SliceData(l[:index]), index)
+		temp = FastParseFloat(l[index+1:])
 
 		measurement, ok := measurements[station]
 		if !ok {
@@ -67,9 +67,9 @@ func run(cmd *cobra.Command, args []string) {
 			}
 			measurements[fmt.Sprintf("%s", station)] = measurement
 		}
-		measurement.Min = min(measurement.Min, value)
-		measurement.Max = max(measurement.Max, value)
-		measurement.Sum += value
+		measurement.Min = min(measurement.Min, temp)
+		measurement.Max = max(measurement.Max, temp)
+		measurement.Sum += temp
 		measurement.Count++
 	}
 	if err != nil && !errors.Is(err, io.EOF) {
@@ -77,22 +77,22 @@ func run(cmd *cobra.Command, args []string) {
 	}
 
 	// Sort keys alphabetically
-	var keys []string
-	for key := range measurements {
-		keys = append(keys, key)
-	}
-	slices.Sort(keys)
+	//var keys []string
+	//for key := range measurements {
+	//	keys = append(keys, key)
+	//}
+	//slices.Sort(keys)
 
 	// Print results
-	for _, key := range keys {
-		measurement := measurements[key]
-		avg := measurement.Sum / float64(measurement.Count)
-		fmt.Printf("%s: %.1f %.1f %.1f\n", key, measurement.Min, avg, measurement.Max)
-	}
+	//for _, key := range keys {
+	//	measurement := measurements[key]
+	//	avg := measurement.Sum / float64(measurement.Count)
+	//	fmt.Printf("%s: %.1f %.1f %.1f\n", key, measurement.Min, avg, measurement.Max)
+	//}
 }
 
 // FastParseFloat parses floats in the format of "12.3" or "-12.3".
-func FastParseFloat(s string) float64 {
+func FastParseFloat(s []byte) float64 {
 	i := uint(0)
 	minus := s[0] == '-'
 	if minus {
