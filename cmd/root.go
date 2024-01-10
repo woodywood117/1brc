@@ -2,14 +2,12 @@ package cmd
 
 import (
 	"bufio"
-	"bytes"
 	"errors"
-	"fmt"
+	"github.com/spf13/cobra"
 	"io"
+	"math/bits"
 	"os"
 	"unsafe"
-
-	"github.com/spf13/cobra"
 )
 
 var rootCmd = &cobra.Command{
@@ -46,6 +44,7 @@ func run(cmd *cobra.Command, args []string) {
 	// Read file line by line and calculate
 	var l []byte
 	var index int
+	var position int
 	var station string
 	var temp float64
 	for {
@@ -53,7 +52,20 @@ func run(cmd *cobra.Command, args []string) {
 		if err != nil {
 			break
 		}
-		index = bytes.IndexByte(l, ';')
+
+		index = 0
+		position = 0
+		for {
+			word := *(*uint64)(unsafe.Pointer(&l[position]))
+			index = FindDelimiter(word)
+			if index != 8 {
+				position += index
+				break
+			}
+			position += 8
+		}
+		index = position
+
 		station = unsafe.String(unsafe.SliceData(l[:index]), index)
 		temp = FastParseFloat(l[index+1:])
 
@@ -65,7 +77,7 @@ func run(cmd *cobra.Command, args []string) {
 				Sum:   0,
 				Count: 0,
 			}
-			measurements[fmt.Sprintf("%s", station)] = measurement
+			measurements[string(l[:index])] = measurement
 		}
 		measurement.Min = min(measurement.Min, temp)
 		measurement.Max = max(measurement.Max, temp)
@@ -126,4 +138,15 @@ func FastParseFloat(s []byte) float64 {
 		f = -f
 	}
 	return f
+}
+
+// FindDelimiter returns the index of the first byte that is a semicolon.
+// It's magic and uses some bit twiddling.
+// It's faster because it checks 8 bytes at once.
+func FindDelimiter(word uint64) int {
+	input := word ^ 0x3B3B3B3B3B3B3B3B
+	tmp := input - 0x0101010101010101
+	tmp = tmp & ^input
+	tmp = tmp & 0x8080808080808080
+	return bits.TrailingZeros64(tmp) >> 3
 }
