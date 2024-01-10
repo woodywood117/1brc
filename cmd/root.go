@@ -7,7 +7,6 @@ import (
 	"io"
 	"os"
 	"slices"
-	"strconv"
 	"strings"
 	"unsafe"
 
@@ -52,16 +51,11 @@ func run(cmd *cobra.Command, args []string) {
 			break
 		}
 		line = unsafe.String(unsafe.SliceData(l), len(l))
-		//line = string(l)
 
 		index := strings.Index(line, ";")
 		station := line[:index]
 		temp := line[index+1:]
-		value, err := strconv.ParseFloat(temp, 64)
-		if err != nil {
-			err = errors.New("invalid line")
-			break
-		}
+		value := FastParseFloat(temp)
 
 		measurement, ok := measurements[station]
 		if !ok {
@@ -95,4 +89,41 @@ func run(cmd *cobra.Command, args []string) {
 		avg := measurement.Sum / float64(measurement.Count)
 		fmt.Printf("%s: %.1f %.1f %.1f\n", key, measurement.Min, avg, measurement.Max)
 	}
+}
+
+// FastParseFloat parses floats in the format of "12.3" or "-12.3".
+func FastParseFloat(s string) float64 {
+	i := uint(0)
+	minus := s[0] == '-'
+	if minus {
+		i++
+	}
+
+	d := uint64(0)
+	for i < uint(len(s)) {
+		if s[i] >= '0' && s[i] <= '9' {
+			d = d*10 + uint64(s[i]-'0')
+			i++
+			continue
+		}
+		break
+	}
+	i++
+
+	// Fast path - just integer.
+	if s[i] == '0' {
+		f := float64(d)
+		if minus {
+			f = -f
+		}
+		return f
+	}
+
+	d = d*10 + uint64(s[i]-'0')
+	i++
+	f := float64(d) / 1e1
+	if minus {
+		f = -f
+	}
+	return f
 }
