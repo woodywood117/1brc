@@ -26,9 +26,9 @@ const Gigabyte = 1024 * 1024 * 1024
 
 func run(cmd *cobra.Command, args []string) {
 	type Measurement struct {
-		Min   float64
-		Max   float64
-		Sum   float64
+		Min   int64
+		Max   int64
+		Sum   int64
 		Count int
 	}
 	var measurements = make(map[string]*Measurement)
@@ -46,7 +46,7 @@ func run(cmd *cobra.Command, args []string) {
 	var index int
 	var position int
 	var station string
-	var temp float64
+	var temp int64
 	for {
 		l, _, err = buffer.ReadLine()
 		if err != nil {
@@ -104,17 +104,17 @@ func run(cmd *cobra.Command, args []string) {
 }
 
 // FastParseFloat parses floats in the format of "12.3" or "-12.3".
-func FastParseFloat(s []byte) float64 {
+func FastParseFloat(s []byte) int64 {
 	i := uint(0)
 	minus := s[0] == '-'
 	if minus {
 		i++
 	}
 
-	d := uint64(0)
+	d := int64(0)
 	for i < uint(len(s)) {
 		if s[i] >= '0' && s[i] <= '9' {
-			d = d*10 + uint64(s[i]-'0')
+			d = d*10 + int64(s[i]-'0')
 			i++
 			continue
 		}
@@ -124,20 +124,18 @@ func FastParseFloat(s []byte) float64 {
 
 	// Fast path - just integer.
 	if s[i] == '0' {
-		f := float64(d)
 		if minus {
-			f = -f
+			d = -d
 		}
-		return f
+		return d
 	}
 
-	d = d*10 + uint64(s[i]-'0')
+	d = d*10 + int64(s[i]-'0')
 	i++
-	f := float64(d) / 1e1
 	if minus {
-		f = -f
+		d = -d
 	}
-	return f
+	return d
 }
 
 // FindDelimiter returns the index of the first byte that is a semicolon.

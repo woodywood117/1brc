@@ -1,24 +1,24 @@
 Execution #1:
-Executed in   60.20 secs    fish           external
-   usr time   57.30 secs  171.00 micros   57.30 secs
-   sys time    0.55 secs  994.00 micros    0.55 secs
+Executed in   57.28 secs    fish           external
+   usr time   54.46 secs    0.16 millis   54.46 secs
+   sys time    0.49 secs    1.35 millis    0.49 secs
 
 Execution #2:
-Executed in   59.87 secs    fish           external
-   usr time   57.19 secs    0.18 millis   57.19 secs
-   sys time    0.35 secs    1.32 millis    0.35 secs
+Executed in   56.46 secs    fish           external
+   usr time   53.81 secs    0.16 millis   53.81 secs
+   sys time    0.37 secs    1.36 millis    0.37 secs
 
 Execution #3:
-Executed in   59.43 secs    fish           external
-   usr time   57.05 secs  195.00 micros   57.05 secs
-   sys time    0.25 secs  428.00 micros    0.25 secs
+Executed in   55.38 secs    fish           external
+   usr time   52.90 secs    0.19 millis   52.90 secs
+   sys time    0.33 secs    1.37 millis    0.33 secs
 
 Execution #4:
-Executed in   60.78 secs    fish           external
-   usr time   58.20 secs  144.00 micros   58.20 secs
-   sys time    0.36 secs  852.00 micros    0.36 secs
+Executed in   55.77 secs    fish           external
+   usr time   53.29 secs    0.15 millis   53.29 secs
+   sys time    0.32 secs    1.10 millis    0.32 secs
 
 Execution #5:
-Executed in   60.45 secs    fish           external
-   usr time   57.84 secs    0.16 millis   57.84 secs
-   sys time    0.33 secs    1.22 millis    0.33 secs
+Executed in   56.18 secs    fish           external
+   usr time   53.31 secs    0.13 millis   53.31 secs
+   sys time    0.66 secs    1.02 millis    0.66 secs
