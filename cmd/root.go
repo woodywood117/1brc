@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"bufio"
 	"errors"
 	"github.com/spf13/cobra"
 	"io"
@@ -22,15 +21,17 @@ func Execute() {
 	}
 }
 
-const Gigabyte = 1024 * 1024 * 1024
+type Measurement struct {
+	Min   int64
+	Max   int64
+	Sum   int64
+	Count int
+}
 
-func run(cmd *cobra.Command, args []string) {
-	type Measurement struct {
-		Min   int64
-		Max   int64
-		Sum   int64
-		Count int
-	}
+const Gigabyte = 1024 * 1024 * 1024
+const ChunkSize = 2 * Gigabyte
+
+func run(_ *cobra.Command, _ []string) {
 	var measurements = make(map[string]*Measurement)
 
 	file, err := os.Open("measurements.txt")
@@ -39,53 +40,34 @@ func run(cmd *cobra.Command, args []string) {
 	}
 	defer file.Close()
 
-	buffer := bufio.NewReaderSize(file, Gigabyte)
-
-	// Read file line by line and calculate
-	var l []byte
-	var index int
-	var position int
-	var station string
-	var temp int64
+	var data = make([]byte, ChunkSize, ChunkSize)
+	var leftover []byte
+	var eof bool
 	for {
-		l, _, err = buffer.ReadLine()
+		if len(leftover) > 0 {
+			copy(data, leftover)
+		}
+		written, err := FillChunk(data[len(leftover):], file)
 		if err != nil {
+			if errors.Is(err, io.EOF) {
+				eof = true
+			} else {
+				panic(err)
+			}
+		}
+
+		if written+len(leftover) < len(data) {
+			if !eof {
+				panic("Should not happen")
+			}
+			data = data[:written+len(leftover)]
+		}
+
+		leftover = ParseChunk(data, measurements)
+
+		if eof {
 			break
 		}
-
-		index = 0
-		position = 0
-		for {
-			word := *(*uint64)(unsafe.Pointer(&l[position]))
-			index = FindDelimiter(word)
-			if index != 8 {
-				position += index
-				break
-			}
-			position += 8
-		}
-		index = position
-
-		station = unsafe.String(unsafe.SliceData(l[:index]), index)
-		temp = FastParseFloat(l[index+1:])
-
-		measurement, ok := measurements[station]
-		if !ok {
-			measurement = &Measurement{
-				Min:   100,
-				Max:   0,
-				Sum:   0,
-				Count: 0,
-			}
-			measurements[string(l[:index])] = measurement
-		}
-		measurement.Min = min(measurement.Min, temp)
-		measurement.Max = max(measurement.Max, temp)
-		measurement.Sum += temp
-		measurement.Count++
-	}
-	if err != nil && !errors.Is(err, io.EOF) {
-		panic(err)
 	}
 
 	// Sort keys alphabetically
@@ -98,8 +80,8 @@ func run(cmd *cobra.Command, args []string) {
 	// Print results
 	//for _, key := range keys {
 	//	measurement := measurements[key]
-	//	avg := measurement.Sum / float64(measurement.Count)
-	//	fmt.Printf("%s: %.1f %.1f %.1f\n", key, measurement.Min, avg, measurement.Max)
+	//	avg := (float64(measurement.Sum) / 1e1) / float64(measurement.Count)
+	//	fmt.Printf("%s: %.1f %.1f %.1f\n", key, float64(measurement.Min)/1e1, avg, float64(measurement.Max)/1e1)
 	//}
 }
 
@@ -141,10 +123,79 @@ func FastParseFloat(s []byte) int64 {
 // FindDelimiter returns the index of the first byte that is a semicolon.
 // It's magic and uses some bit twiddling.
 // It's faster because it checks 8 bytes at once.
+// TODO: Would this work for '\n'?
 func FindDelimiter(word uint64) int {
 	input := word ^ 0x3B3B3B3B3B3B3B3B
 	tmp := input - 0x0101010101010101
 	tmp = tmp & ^input
 	tmp = tmp & 0x8080808080808080
 	return bits.TrailingZeros64(tmp) >> 3
+}
+
+func ParseChunk(chunk []byte, measurements map[string]*Measurement) (leftover []byte) {
+	var l []byte
+	var start int
+	var semi int
+	var position int
+	var end int
+	var station string
+	var temp int64
+	for {
+		if start >= len(chunk) {
+			break
+		}
+		end = start
+		for end < len(chunk) && chunk[end] != '\n' {
+			end++
+		}
+		if end >= len(chunk) {
+			leftover = chunk[start:]
+			return
+		}
+		l = chunk[start:end]
+		start = end + 1
+
+		semi = 0
+		position = 0
+		for {
+			word := *(*uint64)(unsafe.Pointer(&l[position]))
+			semi = FindDelimiter(word)
+			if semi != 8 {
+				position += semi
+				break
+			}
+			position += 8
+		}
+		semi = position
+
+		station = unsafe.String(unsafe.SliceData(l[:semi]), semi)
+		temp = FastParseFloat(l[semi+1:])
+
+		measurement, ok := measurements[station]
+		if !ok {
+			measurement = &Measurement{
+				Min:   100,
+				Max:   0,
+				Sum:   0,
+				Count: 0,
+			}
+			measurements[string(l[:semi])] = measurement
+		}
+		measurement.Min = min(measurement.Min, temp)
+		measurement.Max = max(measurement.Max, temp)
+		measurement.Sum += temp
+		measurement.Count++
+	}
+	return
+}
+
+func FillChunk(chunk []byte, reader io.Reader) (int, error) {
+	var total int
+	for {
+		n, err := reader.Read(chunk[total:])
+		total += n
+		if n == 0 || err != nil {
+			return total, err
+		}
+	}
 }
