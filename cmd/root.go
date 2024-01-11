@@ -120,12 +120,18 @@ func FastParseFloat(s []byte) int64 {
 	return d
 }
 
-// FindDelimiter returns the index of the first byte that is a semicolon.
+// FindSemicolon returns the index of the first byte that is a semicolon.
 // It's magic and uses some bit twiddling.
 // It's faster because it checks 8 bytes at once.
-// TODO: Would this work for '\n'?
-func FindDelimiter(word uint64) int {
+func FindSemicolon(word uint64) int {
 	input := word ^ 0x3B3B3B3B3B3B3B3B
+	tmp := input - 0x0101010101010101
+	tmp = tmp & ^input
+	tmp = tmp & 0x8080808080808080
+	return bits.TrailingZeros64(tmp) >> 3
+}
+func FindNewLine(word uint64) int {
+	input := word ^ 0x0A0A0A0A0A0A0A0A
 	tmp := input - 0x0101010101010101
 	tmp = tmp & ^input
 	tmp = tmp & 0x8080808080808080
@@ -135,6 +141,8 @@ func FindDelimiter(word uint64) int {
 func ParseChunk(chunk []byte, measurements map[string]*Measurement) (leftover []byte) {
 	var l []byte
 	var start int
+	var word uint64
+	var newline int
 	var semi int
 	var position int
 	var end int
@@ -145,9 +153,17 @@ func ParseChunk(chunk []byte, measurements map[string]*Measurement) (leftover []
 			break
 		}
 		end = start
-		for end < len(chunk) && chunk[end] != '\n' {
-			end++
+		position = 0
+		for end+position < len(chunk) {
+			word = *(*uint64)(unsafe.Pointer(&chunk[end+position]))
+			newline = FindNewLine(word)
+			if newline != 8 {
+				position += newline
+				break
+			}
+			position += 8
 		}
+		end += position
 		if end >= len(chunk) {
 			leftover = chunk[start:]
 			return
@@ -158,8 +174,8 @@ func ParseChunk(chunk []byte, measurements map[string]*Measurement) (leftover []
 		semi = 0
 		position = 0
 		for {
-			word := *(*uint64)(unsafe.Pointer(&l[position]))
-			semi = FindDelimiter(word)
+			word = *(*uint64)(unsafe.Pointer(&l[position]))
+			semi = FindSemicolon(word)
 			if semi != 8 {
 				position += semi
 				break
