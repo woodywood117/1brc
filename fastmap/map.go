@@ -63,6 +63,11 @@ func (m *Map[T]) Get(key string) (value T, ok bool) {
 	return
 }
 
+func (m *Map[T]) ForEach(lambda func(string, T) bool) {
+	for item := m.listHead.nextPtr; item != nil && lambda(item.key, *item.value); item = item.nextPtr {
+	}
+}
+
 func (m *Map[T]) allocate(newSize uintptr) {
 	for {
 		currentStore := m.metadata
