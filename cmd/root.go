@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"1brc/fastmap"
 	"errors"
 	"github.com/spf13/cobra"
 	"io"
@@ -29,10 +30,10 @@ type Measurement struct {
 }
 
 const Gigabyte = 1024 * 1024 * 1024
-const ChunkSize = 2 * Gigabyte
+const ChunkSize = Gigabyte
 
 func run(_ *cobra.Command, _ []string) {
-	var measurements = make(map[string]*Measurement)
+	var measurements = fastmap.New[*Measurement]()
 
 	file, err := os.Open("measurements.txt")
 	if err != nil {
@@ -138,7 +139,7 @@ func FindNewLine(word uint64) int {
 	return bits.TrailingZeros64(tmp) >> 3
 }
 
-func ParseChunk(chunk []byte, measurements map[string]*Measurement) (leftover []byte) {
+func ParseChunk(chunk []byte, measurements *fastmap.Map[*Measurement]) (leftover []byte) {
 	var l []byte
 	var start int
 	var word uint64
@@ -187,7 +188,7 @@ func ParseChunk(chunk []byte, measurements map[string]*Measurement) (leftover []
 		station = unsafe.String(unsafe.SliceData(l[:semi]), semi)
 		temp = FastParseFloat(l[semi+1:])
 
-		measurement, ok := measurements[station]
+		measurement, ok := measurements.Get(station)
 		if !ok {
 			measurement = &Measurement{
 				Min:   100,
@@ -195,7 +196,7 @@ func ParseChunk(chunk []byte, measurements map[string]*Measurement) (leftover []
 				Sum:   0,
 				Count: 0,
 			}
-			measurements[string(l[:semi])] = measurement
+			measurements.Set(string(l[:semi]), measurement)
 		}
 		measurement.Min = min(measurement.Min, temp)
 		measurement.Max = max(measurement.Max, temp)
