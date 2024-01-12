@@ -2,7 +2,6 @@ package fastmap
 
 import (
 	"strconv"
-	"sync/atomic"
 	"unsafe"
 )
 
@@ -17,21 +16,20 @@ const (
 	intSizeBytes = strconv.IntSize >> 3
 )
 
-// TODO: Remove atomic operations
 func (md *metadata[T]) addItemToIndex(item *element[T]) uintptr {
 	index := item.keyHash >> md.keyshifts
 	ptr := (*unsafe.Pointer)(unsafe.Pointer(uintptr(md.data) + index*intSizeBytes))
 	for {
-		elem := (*element[T])(atomic.LoadPointer(ptr))
+		elem := (*element[T])(*ptr)
 		if elem == nil {
-			if atomic.CompareAndSwapPointer(ptr, nil, unsafe.Pointer(item)) {
-				md.count += 1
-				return md.count
-			}
-			continue
+			*ptr = unsafe.Pointer(item)
+			md.count += 1
+			return md.count
 		}
 		if item.keyHash < elem.keyHash {
-			if !atomic.CompareAndSwapPointer(ptr, unsafe.Pointer(elem), unsafe.Pointer(item)) {
+			if *ptr == unsafe.Pointer(elem) {
+				*ptr = unsafe.Pointer(item)
+			} else {
 				continue
 			}
 		}
@@ -39,15 +37,14 @@ func (md *metadata[T]) addItemToIndex(item *element[T]) uintptr {
 	}
 }
 
-// TODO: Remove atomic operations
 func (md *metadata[T]) indexElement(hashedKey uintptr) *element[T] {
 	index := hashedKey >> md.keyshifts
 	ptr := (*unsafe.Pointer)(unsafe.Pointer(uintptr(md.data) + index*intSizeBytes))
-	item := (*element[T])(atomic.LoadPointer(ptr))
+	item := (*element[T])(*ptr)
 	for (item == nil || hashedKey < item.keyHash) && index > 0 {
 		index--
 		ptr = (*unsafe.Pointer)(unsafe.Pointer(uintptr(md.data) + index*intSizeBytes))
-		item = (*element[T])(atomic.LoadPointer(ptr))
+		item = (*element[T])(*ptr)
 	}
 	return item
 }
